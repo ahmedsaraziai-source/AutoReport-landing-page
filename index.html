@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AutoReport — Automated Client Reporting for Agencies</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Instrument+Sans:wght@400;500;600&family=Instrument+Mono&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0b0b09;
+    --surface: #131310;
+    --card:    #1a1a16;
+    --border:  #2a2a24;
+    --gold:    #d4a843;
+    --gold2:   #f0c866;
+    --cream:   #f0ead8;
+    --muted:   #7a7668;
+    --text:    #e8e2d0;
+    --white:   #ffffff;
+    --green:   #4a7c59;
+    --green2:  #6aaf82;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Instrument Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  /* ── Custom cursor (desktop only) ── */
+  @media (hover: hover) and (pointer: fine) {
+    body { cursor: none; }
+    .cursor {
+      width: 10px; height: 10px;
+      background: var(--gold);
+      border-radius: 50%;
+      position: fixed; pointer-events: none; z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s, width 0.2s, height 0.2s, background 0.2s;
+    }
+    .cursor-ring {
+      width: 36px; height: 36px;
+      border: 1px solid rgba(212,168,67,0.4);
+      border-radius: 50%;
+      position: fixed; pointer-events: none; z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: transform 0.18s cubic-bezier(.22,.68,0,1.2), width 0.25s, height 0.25s;
+    }
+    body:has(a:hover) .cursor,
+    body:has(button:hover) .cursor { width: 6px; height: 6px; background: var(--gold2); }
+    body:has(a:hover) .cursor-ring,
+    body:has(button:hover) .cursor-ring { width: 52px; height: 52px; border-color: var(--gold); }
+  }
+  @media (hover: none), (pointer: coarse) {
+    .cursor, .cursor-ring { display: none !important; }
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.028; pointer-events: none; z-index: 1000;
+  }
+
+  /* ── Nav ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 48px;
+    border-bottom: 1px solid transparent;
+    transition: background 0.3s, border-color 0.3s, padding 0.3s;
+  }
+  nav.scrolled {
+    background: rgba(11,11,9,0.92);
+    border-color: var(--border);
+    backdrop-filter: blur(12px);
+    padding: 14px 48px;
+  }
+  .nav-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; color: var(--gold);
+    letter-spacing: -0.5px; text-decoration: none;
+  }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a {
+    font-size: 13px; color: var(--muted); text-decoration: none;
+    transition: color 0.15s; letter-spacing: 0.3px; white-space: nowrap;
+  }
+  .nav-links a:hover { color: var(--text); }
+  @media (max-width: 600px) {
+    nav { padding: 14px 20px; }
+    nav.scrolled { padding: 12px 20px; }
+    .nav-links a { display: none; }
+  }
+  .nav-cta {
+    background: var(--gold); color: var(--bg);
+    border: none; padding: 9px 20px; border-radius: 4px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .nav-cta:hover { background: var(--gold2); transform: translateY(-1px); }
+
+  /* ── Hero ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 120px 24px 80px;
+    position: relative; text-align: center;
+    overflow: hidden;
+  }
+
+  /* radial glow */
+  .hero::after {
+    content: '';
+    position: absolute;
+    width: 700px; height: 700px;
+    background: radial-gradient(ellipse, rgba(212,168,67,0.08) 0%, transparent 70%);
+    top: 50%; left: 50%; transform: translate(-50%, -60%);
+    pointer-events: none;
+  }
+
+  /* horizontal rule lines */
+  .hero-lines {
+    position: absolute; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 0;
+  }
+  .h-line { width: 100%; height: 1px; background: var(--border); opacity: 0.4; }
+
+  .eyebrow {
+    font-family: 'Instrument Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+    animation: fadeUp 0.8s ease both;
+  }
+  .eyebrow::before, .eyebrow::after {
+    content: ''; width: 32px; height: 1px; background: var(--gold); opacity: 0.5;
+  }
+
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 8vw, 96px);
+    line-height: 1.0; letter-spacing: -2px;
+    color: var(--cream); margin-bottom: 28px;
+    animation: fadeUp 0.8s 0.1s ease both;
+  }
+  .hero-title em {
+    font-style: italic; color: var(--gold);
+  }
+
+  .hero-sub {
+    font-size: clamp(15px, 2vw, 18px);
+    color: var(--muted); max-width: 520px; line-height: 1.7;
+    margin-bottom: 44px;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .hero-actions {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center;
+    animation: fadeUp 0.8s 0.3s ease both;
+  }
+  .btn-hero {
+    padding: 14px 32px; border-radius: 4px; font-size: 15px; font-weight: 600;
+    cursor: pointer; border: none; font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.2s; letter-spacing: 0.2px;
+  }
+  .btn-hero-primary {
+    background: var(--gold); color: var(--bg);
+  }
+  .btn-hero-primary:hover { background: var(--gold2); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(212,168,67,0.25); }
+  .btn-hero-ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-hero-ghost:hover { border-color: var(--muted); background: var(--surface); }
+
+  .hero-note {
+    margin-top: 18px; font-size: 12px; color: var(--muted);
+    font-family: 'Instrument Mono', monospace;
+    animation: fadeUp 0.8s 0.4s ease both;
+  }
+
+  /* ── Social proof strip ── */
+  .proof-strip {
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    padding: 20px 48px;
+    display: flex; align-items: center; justify-content: center; gap: 48px;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+  .proof-item { display: flex; align-items: center; gap: 10px; }
+  .proof-num {
+    font-family: 'Playfair Display', serif; font-size: 26px; color: var(--cream);
+  }
+  .proof-label { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .proof-div { width: 1px; height: 32px; background: var(--border); }
+
+  /* ── Section base ── */
+  section { padding: 100px 48px; max-width: 1160px; margin: 0 auto; }
+  .section-label {
+    font-family: 'Instrument Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 5vw, 52px);
+    line-height: 1.1; letter-spacing: -1px;
+    color: var(--cream); margin-bottom: 16px;
+  }
+  .section-title em { font-style: italic; color: var(--gold); }
+  .section-sub {
+    font-size: 16px; color: var(--muted); max-width: 480px; line-height: 1.7;
+  }
+
+  /* ── Problem section ── */
+  .problem-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    margin-top: 56px;
+  }
+  .problem-col { padding: 40px; }
+  .problem-col:first-child {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .problem-col:last-child { background: var(--card); }
+  .col-label {
+    font-family: 'Instrument Mono', monospace; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .col-label.bad { color: #c45c2e; }
+  .col-label.good { color: var(--green2); }
+  .problem-item {
+    display: flex; gap: 12px; margin-bottom: 18px; align-items: flex-start;
+  }
+  .problem-icon { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+  .problem-text { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .problem-text strong { color: var(--text); }
+
+  /* ── How it works ── */
+  .steps-wrap { margin-top: 64px; position: relative; }
+  .steps-line {
+    position: absolute; left: 28px; top: 28px; bottom: 28px;
+    width: 1px; background: var(--border);
+  }
+  .step {
+    display: flex; gap: 32px; margin-bottom: 48px; align-items: flex-start;
+    opacity: 0; transform: translateX(-20px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .step.visible { opacity: 1; transform: none; }
+  .step-num {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Playfair Display', serif; font-size: 20px; color: var(--gold);
+    flex-shrink: 0; position: relative; z-index: 1;
+  }
+  .step-body { padding-top: 12px; }
+  .step-title { font-size: 18px; font-weight: 600; color: var(--cream); margin-bottom: 8px; }
+  .step-desc { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 500px; }
+  .step-tag {
+    display: inline-block; margin-top: 10px;
+    font-family: 'Instrument Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--green2); background: rgba(74,124,89,0.12);
+    border: 1px solid rgba(74,124,89,0.2);
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  /* ── Report mockup ── */
+  .mockup-section {
+    padding: 0 0 100px; max-width: 1160px; margin: 0 auto;
+  }
+  .mockup-inner {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+  .mockup-bar {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; gap: 8px; align-items: center;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+  .mockup-url {
+    flex: 1; background: var(--border); border-radius: 4px;
+    padding: 4px 12px; font-family: 'Instrument Mono', monospace;
+    font-size: 11px; color: var(--muted); margin: 0 12px;
+    text-align: center;
+  }
+  .report-preview {
+    padding: 40px 48px;
+  }
+  .rp-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding-bottom: 28px; border-bottom: 1px solid var(--border); margin-bottom: 32px;
+  }
+  .rp-client { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--cream); }
+  .rp-period { font-family: 'Instrument Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .rp-logo { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold); opacity: 0.7; }
+  .rp-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px; }
+  .rp-metric { }
+  .rp-m-label { font-family: 'Instrument Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .rp-m-val { font-family: 'Playfair Display', serif; font-size: 30px; color: var(--cream); margin: 6px 0 4px; }
+  .rp-m-delta { font-size: 12px; }
+  .up { color: var(--green2); } .dn { color: #c45c2e; }
+  .rp-bars { margin-bottom: 24px; }
+  .rp-bars-label { font-family: 'Instrument Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 72px; }
+  .bar-g { flex: 1; background: rgba(212,168,67,0.3); border-radius: 2px 2px 0 0; min-height: 4px; position: relative; }
+  .bar-g::after { content: ''; position: absolute; inset: 0; background: var(--gold); border-radius: 2px 2px 0 0; opacity: 0.7; transform-origin: bottom; animation: growBar 1s cubic-bezier(.22,.68,0,1.2) both; }
+  @keyframes growBar { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+  .rp-ai {
+    background: rgba(212,168,67,0.06); border: 1px solid rgba(212,168,67,0.15);
+    border-radius: 8px; padding: 16px 20px;
+  }
+  .rp-ai-label { font-family: 'Instrument Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--gold); text-transform: uppercase; margin-bottom: 8px; }
+  .rp-ai-text { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+  /* ── Features grid ── */
+  .features-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+    background: var(--border); border-radius: 12px; overflow: hidden;
+    margin-top: 56px;
+  }
+  .feature-cell {
+    background: var(--surface); padding: 36px 32px;
+    transition: background 0.2s;
+  }
+  .feature-cell:hover { background: var(--card); }
+  .feature-icon { font-size: 24px; margin-bottom: 16px; }
+  .feature-name { font-size: 16px; font-weight: 600; color: var(--cream); margin-bottom: 8px; }
+  .feature-desc { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+  /* ── Testimonials ── */
+  .testimonials { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-top: 56px; }
+  .testi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 28px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .testi:hover { border-color: rgba(212,168,67,0.3); transform: translateY(-3px); }
+  .testi-text { font-size: 14px; color: var(--text); line-height: 1.7; margin-bottom: 20px; font-style: italic; }
+  .testi-author { display: flex; align-items: center; gap: 10px; }
+  .testi-avatar {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .testi-name { font-size: 13px; font-weight: 600; color: var(--cream); }
+  .testi-role { font-size: 11px; color: var(--muted); }
+  .stars { color: var(--gold); font-size: 12px; margin-bottom: 14px; }
+
+  /* ── Pricing ── */
+  .pricing-wrap {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-top: 56px;
+  }
+  .price-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 36px 28px;
+    background: var(--surface); position: relative; transition: transform 0.2s;
+  }
+  .price-card:hover { transform: translateY(-4px); }
+  .price-card.featured {
+    border-color: var(--gold); background: var(--card);
+    box-shadow: 0 0 0 1px var(--gold), 0 24px 48px rgba(212,168,67,0.1);
+  }
+  .featured-tag {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    background: var(--gold); color: var(--bg); font-size: 10px; font-weight: 700;
+    padding: 3px 14px; border-radius: 20px; letter-spacing: 1.5px; text-transform: uppercase;
+    font-family: 'Instrument Mono', monospace;
+  }
+  .price-plan { font-family: 'Instrument Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .price-amount { font-family: 'Playfair Display', serif; font-size: 48px; color: var(--cream); }
+  .price-amount span { font-size: 16px; font-family: 'Instrument Sans', sans-serif; color: var(--muted); }
+  .price-desc { font-size: 13px; color: var(--muted); margin: 10px 0 24px; line-height: 1.6; }
+  .price-features { list-style: none; margin-bottom: 28px; }
+  .price-features li { font-size: 13.5px; color: var(--muted); padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+  .price-features li:last-child { border: none; }
+  .price-features li strong { color: var(--text); }
+  .chk { color: var(--green2); }
+  .btn-plan {
+    width: 100%; padding: 12px; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.2s; letter-spacing: 0.2px;
+  }
+  .btn-plan-default { background: var(--border); color: var(--text); }
+  .btn-plan-default:hover { background: #3a3a32; }
+  .btn-plan-gold { background: var(--gold); color: var(--bg); }
+  .btn-plan-gold:hover { background: var(--gold2); box-shadow: 0 4px 16px rgba(212,168,67,0.3); }
+
+  /* ── CTA section ── */
+  .cta-section {
+    text-align: center; padding: 100px 48px;
+    border-top: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .cta-section::before {
+    content: '';
+    position: absolute; width: 600px; height: 600px;
+    background: radial-gradient(ellipse, rgba(212,168,67,0.07) 0%, transparent 70%);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .cta-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(36px, 6vw, 68px); line-height: 1.05;
+    letter-spacing: -1.5px; color: var(--cream); margin-bottom: 20px;
+    position: relative;
+  }
+  .cta-title em { font-style: italic; color: var(--gold); }
+  .cta-sub { font-size: 16px; color: var(--muted); margin-bottom: 40px; }
+  .cta-input-row {
+    display: flex; gap: 10px; max-width: 440px; margin: 0 auto 14px;
+  }
+  .cta-input {
+    flex: 1; padding: 13px 16px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font-size: 14px; font-family: 'Instrument Sans', sans-serif;
+    outline: none; transition: border-color 0.15s;
+  }
+  .cta-input:focus { border-color: var(--gold); }
+  .cta-input::placeholder { color: var(--muted); }
+  .cta-btn {
+    padding: 13px 24px; background: var(--gold); color: var(--bg);
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .cta-btn:hover { background: var(--gold2); transform: translateY(-1px); }
+  .cta-note { font-size: 12px; color: var(--muted); font-family: 'Instrument Mono', monospace; }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 48px;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px;
+  }
+  .footer-logo { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--gold); }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { font-size: 12px; color: var(--muted); text-decoration: none; transition: color 0.15s; }
+  .footer-links a:hover { color: var(--text); }
+  .footer-copy { font-size: 12px; color: var(--muted); font-family: 'Instrument Mono', monospace; }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .reveal {
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s, transform 0.6s;
+  }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── Divider ── */
+  .full-border { border-top: 1px solid var(--border); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    nav { padding: 16px 20px; }
+    section { padding: 60px 20px; }
+    .problem-grid { grid-template-columns: 1fr; }
+    .problem-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+    .features-grid { grid-template-columns: 1fr; }
+    .testimonials { grid-template-columns: 1fr; }
+    .pricing-wrap { grid-template-columns: 1fr; }
+    .proof-strip { gap: 20px; padding: 20px; }
+    .proof-div { display: none; }
+    .rp-metrics { grid-template-columns: repeat(2,1fr); }
+    .report-preview { padding: 24px; }
+    footer { flex-direction: column; text-align: center; }
+    body { cursor: auto; }
+    .cursor, .cursor-ring { display: none; }
+    .cta-input-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a class="nav-logo" href="#">AutoReport</a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <button class="nav-cta" onclick="openTally()">Start Free Trial</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-lines">
+    <div class="h-line"></div>
+    <div class="h-line"></div>
+    <div class="h-line"></div>
+  </div>
+  <div class="eyebrow">Automated Client Reporting</div>
+  <h1 class="hero-title">Stop writing<br/><em>reports by hand.</em></h1>
+  <p class="hero-sub">AutoReport pulls your clients' data from GA4, Stripe, and Meta Ads — then sends beautiful, branded reports automatically. Every week or month. While you sleep.</p>
+  <div class="hero-actions">
+    <button class="btn-hero btn-hero-primary" onclick="openTally()">Start Free Trial — 14 days free</button>
+    <button class="btn-hero btn-hero-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">See how it works ↓</button>
+  </div>
+  <div class="hero-note">No credit card required · Setup in under 10 minutes · Cancel anytime</div>
+</section>
+
+<!-- PROOF STRIP -->
+<div class="proof-strip">
+  <div class="proof-item">
+    <div class="proof-num">Early</div>
+    <div class="proof-label">access<br/>now open</div>
+  </div>
+  <div class="proof-div"></div>
+  <div class="proof-item">
+    <div class="proof-num">14</div>
+    <div class="proof-label">days free<br/>no card needed</div>
+  </div>
+  <div class="proof-div"></div>
+  <div class="proof-item">
+    <div class="proof-num">5h+</div>
+    <div class="proof-label">saved per client<br/>per month</div>
+  </div>
+  <div class="proof-div"></div>
+  <div class="proof-item">
+    <div class="proof-num">€0</div>
+    <div class="proof-label">to get<br/>started today</div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section>
+  <div class="section-label reveal">The Problem</div>
+  <h2 class="section-title reveal">You're losing hours every<br/><em>month to copy-paste.</em></h2>
+  <p class="section-sub reveal">Reporting should take minutes, not days. Every hour you spend building decks in Google Slides is an hour you're not spending on actual client work.</p>
+
+  <div class="problem-grid reveal">
+    <div class="problem-col">
+      <div class="col-label bad">✕ Without AutoReport</div>
+      <div class="problem-item"><div class="problem-icon">😩</div><div class="problem-text"><strong>4–8 hours per client</strong> manually pulling data from GA4, Stripe, and ad platforms</div></div>
+      <div class="problem-item"><div class="problem-icon">📊</div><div class="problem-text"><strong>Copy-pasting into slides</strong> that look slightly different every month</div></div>
+      <div class="problem-item"><div class="problem-icon">📧</div><div class="problem-text"><strong>Forgetting to send</strong> or sending late because you're juggling 12 other things</div></div>
+      <div class="problem-item"><div class="problem-icon">🤷</div><div class="problem-text"><strong>No insights</strong> — just numbers dumped in a table with no context</div></div>
+    </div>
+    <div class="problem-col">
+      <div class="col-label good">✓ With AutoReport</div>
+      <div class="problem-item"><div class="problem-icon">⚡</div><div class="problem-text"><strong>Set up once</strong>, reports go out automatically every week or month</div></div>
+      <div class="problem-item"><div class="problem-icon">✨</div><div class="problem-text"><strong>Beautiful branded PDFs</strong> with your logo, consistent every single time</div></div>
+      <div class="problem-item"><div class="problem-icon">🕐</div><div class="problem-text"><strong>Always on time</strong> — automated scheduling means nothing slips through</div></div>
+      <div class="problem-item"><div class="problem-icon">🤖</div><div class="problem-text"><strong>AI-written summaries</strong> that explain what the numbers actually mean</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="full-border">
+  <div class="section-label reveal">How It Works</div>
+  <h2 class="section-title reveal">Three steps.<br/><em>Fully automated.</em></h2>
+
+  <div class="steps-wrap">
+    <div class="steps-line"></div>
+    <div class="step" data-step>
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Connect your client's data sources</div>
+        <div class="step-desc">Link GA4, Stripe, Meta Ads, or Google Ads in one click. OAuth-based — no API keys, no developer needed. Takes under 5 minutes per client.</div>
+        <div class="step-tag">One-time setup</div>
+      </div>
+    </div>
+    <div class="step" data-step>
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Choose your schedule and branding</div>
+        <div class="step-desc">Weekly, bi-weekly, or monthly. Upload your logo, set the reply-to email, pick which metrics to highlight. AutoReport takes care of the rest.</div>
+        <div class="step-tag">Set it and forget it</div>
+      </div>
+    </div>
+    <div class="step" data-step>
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Reports go out automatically</div>
+        <div class="step-desc">On the day you set, AutoReport pulls fresh data, generates an AI summary of key insights, renders a branded PDF, and emails it directly to your client.</div>
+        <div class="step-tag">Fully automated</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REPORT MOCKUP -->
+<div class="mockup-section" style="padding: 0 48px 100px;">
+  <div class="mockup-inner reveal">
+    <div class="mockup-bar">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <div class="mockup-url">auto-report-page.vercel.app/r/bloom-studio/may-2025</div>
+    </div>
+    <div class="report-preview">
+      <div class="rp-header">
+        <div>
+          <div class="rp-client">Bloom Studio</div>
+          <div class="rp-period">MAY 2025 · MONTHLY PERFORMANCE REPORT</div>
+        </div>
+        <div class="rp-logo">AutoReport</div>
+      </div>
+      <div class="rp-metrics">
+        <div class="rp-metric">
+          <div class="rp-m-label">Sessions</div>
+          <div class="rp-m-val">18,420</div>
+          <div class="rp-m-delta up">↑ +12.4% vs Apr</div>
+        </div>
+        <div class="rp-metric">
+          <div class="rp-m-label">Revenue</div>
+          <div class="rp-m-val">€42,800</div>
+          <div class="rp-m-delta up">↑ +8.1% vs Apr</div>
+        </div>
+        <div class="rp-metric">
+          <div class="rp-m-label">Conv. Rate</div>
+          <div class="rp-m-val">3.8%</div>
+          <div class="rp-m-delta dn">↓ -0.3% vs Apr</div>
+        </div>
+        <div class="rp-metric">
+          <div class="rp-m-label">New Users</div>
+          <div class="rp-m-val">6,104</div>
+          <div class="rp-m-delta up">↑ +19.2% vs Apr</div>
+        </div>
+      </div>
+      <div class="rp-bars">
+        <div class="rp-bars-label">Weekly Sessions</div>
+        <div class="bars">
+          <div class="bar-g" style="height:45px"></div>
+          <div class="bar-g" style="height:52px"></div>
+          <div class="bar-g" style="height:38px"></div>
+          <div class="bar-g" style="height:61px"></div>
+          <div class="bar-g" style="height:48px"></div>
+          <div class="bar-g" style="height:55px"></div>
+          <div class="bar-g" style="height:42px"></div>
+          <div class="bar-g" style="height:68px"></div>
+        </div>
+      </div>
+      <div class="rp-ai">
+        <div class="rp-ai-label">✦ AI Summary</div>
+        <div class="rp-ai-text">Traffic grew steadily in May, driven primarily by organic search (+18%) and direct visits. Revenue is up across all product categories. Conversion rate dipped slightly — this appears correlated with a higher share of mobile traffic (now 62%). <strong style="color:var(--text)">Recommend: A/B test the mobile checkout flow to recover the 0.3% conversion gap.</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features" class="full-border" style="padding-top: 100px;">
+  <div class="section-label reveal">Features</div>
+  <h2 class="section-title reveal">Everything your agency<br/><em>needs. Nothing it doesn't.</em></h2>
+  <div class="features-grid reveal">
+    <div class="feature-cell">
+      <div class="feature-icon">🔗</div>
+      <div class="feature-name">Native Integrations</div>
+      <div class="feature-desc">GA4, Stripe, Meta Ads, Google Ads — connected via OAuth. No developer needed, no API keys to manage.</div>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-name">AI-Written Summaries</div>
+      <div class="feature-desc">Each report includes a plain-English analysis of what the numbers mean and what to do about them.</div>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-icon">🎨</div>
+      <div class="feature-name">White-Label Branding</div>
+      <div class="feature-desc">Your logo, your colours, your domain. Clients see your agency's name — not ours.</div>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-icon">📅</div>
+      <div class="feature-name">Flexible Scheduling</div>
+      <div class="feature-desc">Weekly, bi-weekly, or monthly. Per-client control. Reports always land in inboxes on time.</div>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-icon">📄</div>
+      <div class="feature-name">PDF + Web Reports</div>
+      <div class="feature-desc">Clients get a beautiful PDF attachment plus a shareable web link they can bookmark and revisit.</div>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-icon">📊</div>
+      <div class="feature-name">Trend Detection</div>
+      <div class="feature-desc">AutoReport flags significant changes — spikes, drops, anomalies — so nothing important goes unnoticed.</div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="full-border">
+  <div class="section-label reveal">Early Access</div>
+  <h2 class="section-title reveal">Be one of our<br/><em>first 10 agencies.</em></h2>
+  <div class="testimonials">
+    <div class="testi reveal">
+      <div class="empty-icon" style="font-size:32px; margin-bottom:16px">🚀</div>
+      <div class="testi-text">We're onboarding our first agencies now. Early users get a lifetime 30% discount and direct access to the founder to shape the product roadmap.</div>
+      <div class="testi-author">
+        <div class="testi-avatar">✉️</div>
+        <div><div class="testi-name">Founding Member Offer</div><div class="testi-role">Limited to first 10 signups</div></div>
+      </div>
+    </div>
+    <div class="testi reveal">
+      <div class="empty-icon" style="font-size:32px; margin-bottom:16px">🎯</div>
+      <div class="testi-text">Tell us which integrations matter most to you — GA4, Stripe, Meta Ads, Google Ads. We'll prioritise based on what our first users actually need.</div>
+      <div class="testi-author">
+        <div class="testi-avatar">🛠️</div>
+        <div><div class="testi-name">Built Around You</div><div class="testi-role">Your feedback shapes the product</div></div>
+      </div>
+    </div>
+    <div class="testi reveal">
+      <div class="empty-icon" style="font-size:32px; margin-bottom:16px">💬</div>
+      <div class="testi-text">Every founding member gets a direct line to the team. No support tickets — just a real conversation to make sure AutoReport works perfectly for your agency.</div>
+      <div class="testi-author">
+        <div class="testi-avatar">👋</div>
+        <div><div class="testi-name">White-Glove Onboarding</div><div class="testi-role">We set everything up with you</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="full-border">
+  <div class="section-label reveal">Pricing</div>
+  <h2 class="section-title reveal">Pay for results,<br/><em>not complexity.</em></h2>
+  <p class="section-sub reveal">All plans include a 14-day free trial. No credit card required to start.</p>
+  <div class="pricing-wrap">
+    <div class="price-card reveal">
+      <div class="price-plan">Starter</div>
+      <div class="price-amount">€49<span>/mo</span></div>
+      <div class="price-desc">Perfect for freelancers and small agencies getting started with automated reporting.</div>
+      <ul class="price-features">
+        <li><span class="chk">✓</span> <span>Up to <strong>3 clients</strong></span></li>
+        <li><span class="chk">✓</span> <span>Monthly reports</span></li>
+        <li><span class="chk">✓</span> <span>GA4 integration</span></li>
+        <li><span class="chk">✓</span> <span>PDF + web delivery</span></li>
+        <li><span class="chk">✓</span> <span>Email support</span></li>
+      </ul>
+      <button class="btn-plan btn-plan-default" onclick="openTally()">Start Free Trial</button>
+    </div>
+    <div class="price-card featured reveal">
+      <div class="featured-tag">Most Popular</div>
+      <div class="price-plan">Pro</div>
+      <div class="price-amount">€149<span>/mo</span></div>
+      <div class="price-desc">For growing agencies that want full automation and white-label reports.</div>
+      <ul class="price-features">
+        <li><span class="chk">✓</span> <span>Up to <strong>15 clients</strong></span></li>
+        <li><span class="chk">✓</span> <span>Weekly or monthly</span></li>
+        <li><span class="chk">✓</span> <span>GA4 + Stripe + Meta Ads</span></li>
+        <li><span class="chk">✓</span> <span><strong>AI-written summaries</strong></span></li>
+        <li><span class="chk">✓</span> <span><strong>White-label branding</strong></span></li>
+        <li><span class="chk">✓</span> <span>Priority support</span></li>
+      </ul>
+      <button class="btn-plan btn-plan-gold" onclick="openTally()">Start Free Trial</button>
+    </div>
+    <div class="price-card reveal">
+      <div class="price-plan">Growth</div>
+      <div class="price-amount">€299<span>/mo</span></div>
+      <div class="price-desc">For established agencies with large client rosters and custom needs.</div>
+      <ul class="price-features">
+        <li><span class="chk">✓</span> <span><strong>Unlimited clients</strong></span></li>
+        <li><span class="chk">✓</span> <span>Any frequency</span></li>
+        <li><span class="chk">✓</span> <span>All integrations</span></li>
+        <li><span class="chk">✓</span> <span>Custom report templates</span></li>
+        <li><span class="chk">✓</span> <span>API access</span></li>
+        <li><span class="chk">✓</span> <span>Dedicated onboarding</span></li>
+      </ul>
+      <button class="btn-plan btn-plan-default" onclick="openTally()">Start Free Trial</button>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h2 class="cta-title reveal">Your first report<br/>sends <em>itself tonight.</em></h2>
+  <p class="cta-sub reveal">Join 340+ agencies. No credit card. Ready in 10 minutes.</p>
+  <div class="cta-input-row reveal">
+    <input class="cta-input" id="cta-email" type="email" placeholder="your@agency.com" />
+    <button class="cta-btn" onclick="openTally()">Get Started →</button>
+  </div>
+  <div class="cta-note reveal">14-day free trial · No credit card · Cancel anytime</div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">AutoReport</div>
+  <div class="footer-links">
+    <a href="#pricing">Pricing</a>
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="mailto:hello@autoreport.io">hello@autoreport.io</a>
+  </div>
+  <div class="footer-copy">© 2026 AutoReport. All rights reserved.</div>
+</footer>
+
+<script>
+  // Custom cursor (desktop only)
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  if (cursor && ring && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    document.addEventListener('mousemove', e => {
+      cursor.style.left = e.clientX + 'px';
+      cursor.style.top = e.clientY + 'px';
+      ring.style.left = e.clientX + 'px';
+      ring.style.top = e.clientY + 'px';
+    });
+  }
+
+  // Tally popup
+  function openTally() {
+    const email = document.getElementById('cta-email').value;
+    const url = 'https://tally.so/r/PdrXDV' + (email ? '?email=' + encodeURIComponent(email) : '');
+    window.open(url, '_blank');
+  }
+
+  // Make all CTA buttons open Tally
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  });
+
+  // Intersection observer for reveals
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+  // Steps observer
+  const stepObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll('[data-step]').forEach((el, i) => {
+    el.style.transitionDelay = `${i * 0.12}s`;
+    stepObs.observe(el);
+  });
+</script>
+</body>
+</html>
